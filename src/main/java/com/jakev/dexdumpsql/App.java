@@ -152,13 +152,18 @@ public class App
 
         String superclassDescriptor = "";
         String classDescriptor = "";
+        String superclassName = "";
         int accessFlags = 0;
         int rtn = 0;
 
-        superclassDescriptor = descriptorToDot(classDef.getSuperclass());
-        if (superclassDescriptor == null) {
+        superclassName = classDef.getSuperclass();
+
+        if (superclassName == null) {
             superclassDescriptor = "None";
         } 
+        else {
+            superclassDescriptor = descriptorToDot(superclassName);
+        }
 
         classDescriptor = descriptorToDot(classDef.getType());
         accessFlags = classDef.getAccessFlags();
