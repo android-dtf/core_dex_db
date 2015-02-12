@@ -16,8 +16,14 @@
  */
 package com.jakev.dexdumpsql;
 
+import org.jf.dexlib2.iface.ClassDef;
+import org.jf.dexlib2.iface.Field;
+import org.jf.dexlib2.iface.Method;
+import org.jf.dexlib2.iface.MethodParameter;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.SQLException;
 
@@ -151,20 +157,26 @@ public class DexDbHelper {
         return rtn;
     }
 
-    public int addSField(String fieldName, String fieldType,
-                         int accessFlags, int classIdx) {
+    public int addStaticFields(ClassDef classDef, int classIdx) {
 
         int rtn = 0;
+        String sql = "INSERT INTO static_fields (name, type, access_flags, class_id) " +
+                     "VALUES (?, ?, ?, "+Integer.toString(classIdx)+")";
 
         try {
-            String sql = "INSERT INTO static_fields (name, type, access_flags, class_id) "+
-                         "VALUES ('"+
-                          fieldName+"', '"+
-                          fieldType+"', "+
-                          Integer.toString(accessFlags)+", "+
-                          Integer.toString(classIdx)+")";
-            stmt.executeUpdate(sql);
-            con.commit();
+            PreparedStatement pStmt = con.prepareStatement(sql);
+
+            for (Field field: classDef.getStaticFields()) {
+
+                pStmt.setString(1, field.getName());
+                pStmt.setString(2, field.getType());
+                pStmt.setInt(3, field.getAccessFlags());
+
+                pStmt.executeUpdate();
+
+                con.commit();
+            }
+
         } catch (SQLException e) {
             System.err.println(e);
             rtn = -1;
@@ -173,44 +185,114 @@ public class DexDbHelper {
         return rtn;
     }
 
-    public int addIField(String fieldName, String fieldType,
-                         int accessFlags, int classIdx) {
+    public int addInstanceFields(ClassDef classDef, int classIdx) {
 
         int rtn = 0;
+        String sql = "INSERT INTO instance_fields (name, type, access_flags, class_id) " +
+                     "VALUES (?, ?, ?, "+Integer.toString(classIdx)+")";
 
         try {
-            String sql = "INSERT INTO instance_fields (name, type, access_flags, class_id) "+
-                         "VALUES ('"+
-                          fieldName+"', '"+
-                          fieldType+"', "+
-                          Integer.toString(accessFlags)+", "+
-                          Integer.toString(classIdx)+")";
-            stmt.executeUpdate(sql);
-            con.commit();
+            PreparedStatement pStmt = con.prepareStatement(sql);
+
+            for (Field field: classDef.getInstanceFields()) {
+
+                pStmt.setString(1, field.getName());
+                pStmt.setString(2, field.getType());
+                pStmt.setInt(3, field.getAccessFlags());
+
+                pStmt.executeUpdate();
+
+                con.commit();
+            }
+
         } catch (SQLException e) {
             System.err.println(e);
             rtn = -1;
         }
 
         return rtn;
-    }      
+    }
 
-    public int addMethod(String methodName, int methodType,
-                         String methodDescriptor, int accessFlags,
-                         int classIdx) {
+    public int addVirtualMethods(ClassDef classDef, int classIdx, int methodType) {
 
         int rtn = 0;
+        int accessFlags = 0;
+        String methodName = "";
+        String methodDescriptor = "";
+        String sql = "INSERT INTO methods (name, type, descriptor, access_flags, class_id) " +
+                     "VALUES (?, ?, ?, ?, "+Integer.toString(classIdx)+")";
+
+        StringBuilder sb = null;
 
         try {
-            String sql = "INSERT INTO methods (name, type, descriptor, access_flags, class_id)"+
-                         "VALUES ('"+
-                         methodName+"', "+
-                         Integer.toString(methodType)+", '"+
-                         methodDescriptor+"', "+
-                         Integer.toString(accessFlags)+", "+
-                         Integer.toString(classIdx)+")";
-            stmt.executeUpdate(sql);
-            con.commit();
+            PreparedStatement pStmt = con.prepareStatement(sql);
+
+            for (Method method: classDef.getVirtualMethods()) {
+
+                sb = new StringBuilder("(");
+                for (MethodParameter param: method.getParameters()) {
+
+                    sb.append(param.getType());
+                }
+                sb.append(")");
+                sb.append(method.getReturnType());
+
+                methodDescriptor = sb.toString();
+
+                pStmt.setString(1, method.getName());
+                pStmt.setInt(2, methodType);
+                pStmt.setString(3, methodDescriptor);
+                pStmt.setInt(4, method.getAccessFlags());
+
+                pStmt.executeUpdate();
+
+                con.commit();
+            }
+
+        } catch (SQLException e) {
+            System.err.println(e);
+            rtn = -1;
+        }
+
+        return rtn;
+    }
+
+    public int addDirectMethods(ClassDef classDef, int classIdx, int methodType) {
+
+        int rtn = 0;
+        int accessFlags = 0;
+        String methodName = "";
+        String methodDescriptor = "";
+        String sql = "INSERT INTO methods (name, type, descriptor, access_flags, class_id) " +
+                     "VALUES (?, ?, ?, ?, "+Integer.toString(classIdx)+")";
+
+        StringBuilder sb = null;
+
+        try {
+            PreparedStatement pStmt = con.prepareStatement(sql);
+
+            for (Method method: classDef.getDirectMethods()) {
+
+                sb = new StringBuilder("(");
+                for (MethodParameter param: method.getParameters()) {
+
+                    sb.append(param.getType());
+                }
+                sb.append(")");
+                sb.append(method.getReturnType());
+
+                methodDescriptor = sb.toString();
+
+                pStmt.setString(1, method.getName());
+                pStmt.setInt(2, methodType);
+                pStmt.setString(3, methodDescriptor);
+                pStmt.setInt(4, method.getAccessFlags());
+
+                pStmt.executeUpdate();
+
+                con.commit();
+            }
+
         } catch (SQLException e) {
             System.err.println(e);
             rtn = -1;

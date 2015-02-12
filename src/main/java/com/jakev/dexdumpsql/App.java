@@ -23,9 +23,6 @@ import java.io.IOException;
 
 import org.jf.dexlib2.iface.ClassDef;
 import org.jf.dexlib2.iface.DexFile;
-import org.jf.dexlib2.iface.Field;
-import org.jf.dexlib2.iface.Method;
-import org.jf.dexlib2.iface.MethodParameter;
 import org.jf.dexlib2.DexFileFactory;
 
 public class App 
@@ -33,7 +30,7 @@ public class App
 
     private static final String gProgramName = "DtfDumpSql";
     private static final String gCmdName = "Dtfdumpsql";
-    private static final String gProgramVersion = "1.0";
+    private static final String gProgramVersion = "1.1";
 
     private static DexFile gDexFile = null;
     private static DexDbHelper gDexDb = null;
@@ -43,7 +40,8 @@ public class App
 
 
     /* Set to true for debugging. */
-    private static final boolean DEBUG = true;
+    //private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     private static void usage() {
 
@@ -184,104 +182,18 @@ public class App
         }
 
         /* Process the static fields */
-        for (Field field: classDef.getStaticFields()) {
-            rtn |= processStaticField(classIdx, field);
-        }
+        rtn = gDexDb.addStaticFields(classDef, classIdx);
 
         /* Process the instance fields */
-        for (Field field: classDef.getInstanceFields()) {
-            rtn |= processInstanceField(classIdx, field);
-        }
+        rtn = gDexDb.addInstanceFields(classDef, classIdx);
 
         /* Process virtual methods */
-        for (Method method: classDef.getVirtualMethods()) {
-            rtn |= processMethod(classIdx, METHOD_TYPE_VIRTUAL, method);
-        }
+        rtn = gDexDb.addVirtualMethods(classDef, classIdx, METHOD_TYPE_VIRTUAL);
 
         /* Process direct methods */
-        for (Method method: classDef.getDirectMethods()) {
-            rtn |= processMethod(classIdx, METHOD_TYPE_DIRECT, method);
-        }
+        rtn = gDexDb.addDirectMethods(classDef, classIdx, METHOD_TYPE_DIRECT);
 
         return rtn;
-    }
-
-    public static int processStaticField(int classIdx, Field field) {
-
-        int rtn = 0;
-        int accessFlags = 0;
-        String fieldName = "";
-        String fieldType = "";
-
-        fieldName = field.getName();
-        fieldType = field.getType();
-        accessFlags = field.getAccessFlags();
-
-        rtn = gDexDb.addSField(fieldName, fieldType, accessFlags, classIdx);
-        if (rtn != 0) {
-            
-            System.err.println("[ERROR] Unable to add static field '"+
-                                fieldName+"' ("+
-                                Integer.toString(rtn)+
-                                ")");
-        }
-        return rtn;
-    }
-
-    public static int processInstanceField(int classIdx, Field field) {
-
-        int rtn = 0;
-        int accessFlags = 0;
-        String fieldName = "";
-        String fieldType = "";
-
-        fieldName = field.getName();
-        fieldType = field.getType();
-        accessFlags = field.getAccessFlags();
-
-        rtn = gDexDb.addIField(fieldName, fieldType, accessFlags, classIdx);
-        if (rtn != 0) {
-            
-            System.err.println("[ERROR] Unable to add instance field '"+
-                                fieldName+"' ("+
-                                Integer.toString(rtn)+
-                                ")");
-        }
-        return rtn;
-    }
-
-    public static int processMethod(int classIdx, int methodType, Method method) {
-
-        int rtn = 0;
-        int accessFlags = 0;
-
-        String methodName = "";
-        String methodDescriptor = "";       
-        StringBuilder sb = null;
-
-        methodName = method.getName();
-        accessFlags = method.getAccessFlags();
-
-        sb = new StringBuilder("(");
-        for (MethodParameter param: method.getParameters()) {
-
-            sb.append(param.getType());
-        }
-        sb.append(")");
-        sb.append(method.getReturnType());
-
-        methodDescriptor = sb.toString();
-
-        rtn = gDexDb.addMethod(methodName, methodType, methodDescriptor, accessFlags, classIdx);
-        if (rtn != 0) {
-
-            System.err.println("[ERROR] Unable to add method '"+
-                                methodName+"' ("+
-                                Integer.toString(rtn)+
-                                ")");
-        }
-        return rtn;
-
     }
 
     public static void main(String[] args) {
