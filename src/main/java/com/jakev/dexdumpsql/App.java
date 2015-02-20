@@ -21,15 +21,22 @@ import com.jakev.dexdumpsql.DexDbHelper;
 import java.io.File;
 import java.io.IOException;
 
+
+import org.apache.commons.cli.BasicParser;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
+
 import org.jf.dexlib2.iface.ClassDef;
 import org.jf.dexlib2.iface.DexFile;
 import org.jf.dexlib2.DexFileFactory;
 
-public class App 
-{
+public class App {
 
-    private static final String gProgramName = "DtfDumpSql";
-    private static final String gCmdName = "Dtfdumpsql";
+    private static final String gProgramName = "DexDumpSql";
+    private static final String gCmdName = "dexdumpsql";
     private static final String gProgramVersion = "1.1";
 
     private static DexFile gDexFile = null;
@@ -38,16 +45,15 @@ public class App
     private static final int METHOD_TYPE_DIRECT = 0;
     private static final int METHOD_TYPE_VIRTUAL = 1;
 
-
-    /* Set to true for debugging. */
-    //private static final boolean DEBUG = true;
-    private static final boolean DEBUG = false;
+    private static Options gOptions = new Options();
+    private static boolean gDebug = false;
 
     private static void usage() {
 
-        System.err.println(gProgramName+" v"+gProgramVersion+" Command Line Utility");
-        System.err.println("Usage: "+gCmdName+" <input_dex> <output_db> <api_level>");
-        System.err.println("");
+        HelpFormatter formatter = new HelpFormatter();
+
+        System.out.println(gProgramName+" v"+gProgramVersion+" Command Line Utility");
+        formatter.printHelp(gCmdName, gOptions);
     }
 
     /* From AOSP : dalvik/tools/dexdeps/src/com/android/dexdeps/Output.java */
@@ -166,7 +172,7 @@ public class App
         classDescriptor = descriptorToDot(classDef.getType());
         accessFlags = classDef.getAccessFlags();
 
-        if (DEBUG) {
+        if (gDebug) {
             System.out.println("Adding class "+classDescriptor);
         }
         /* Add this class */
@@ -204,21 +210,53 @@ public class App
         String dexDbName = "";
         int sdkVersion = 0;
 
-        if (args.length != 3) {
-            usage();
-            System.exit(-2);
+        CommandLineParser parser = new BasicParser();
+        CommandLine cmd = null;
+
+        gOptions.addOption("a", true, "Android API level to use.");
+        gOptions.addOption("d", false, "Show debugging information.");
+        gOptions.addOption("h", false, "Show help screen.");
+        gOptions.addOption("i", true, "Input DEX/ODEX file.");
+        gOptions.addOption("o", true, "Output DB file.");
+
+        try {
+            cmd = parser.parse(gOptions, args);
+
+            if (cmd.hasOption("h")) {
+                usage();
+                System.exit(0);
+            }
+
+            if (cmd.hasOption("d"))
+                gDebug = true;
+
+            if (!cmd.hasOption("i") || !cmd.hasOption("o") || !cmd.hasOption("a")) {
+                System.err.println("[ERROR] Input, output, and API level parameters are required!");
+                usage();
+                System.exit(-1);
+            }
+
+        } catch (ParseException e) {
+            System.err.println("[ERROR] Unable to parse command line properties: "+e);
+            System.exit(-1);
         }
 
-        dexFileName = args[0];
-        dexDbName = args[1];
-        sdkVersion = Integer.parseInt(args[2]);
+        dexFileName = cmd.getOptionValue("i");
+        dexDbName = cmd.getOptionValue("o");
+
+        try {
+            sdkVersion = Integer.parseInt(cmd.getOptionValue("a"));
+        } catch (NumberFormatException e) {
+            System.err.println("[ERROR] Numeric API level required!");
+            System.exit(-2);
+        }
 
         if (!isFile(dexFileName)) {
             System.err.println("[ERROR] File '"+dexFileName+"' does not exist!");
             System.exit(-3);
         }
 
-        if (DEBUG) { System.out.println("Loading DEX into object."); }
+        if (gDebug) { System.out.println("Loading DEX into object."); }
         try {
             gDexFile = DexFileFactory.loadDexFile(dexFileName, sdkVersion);
         } catch (IOException e){
@@ -226,31 +264,31 @@ public class App
             System.exit(-4);
         }
 
-        if (DEBUG) { System.out.println("Creating DexDbHelper."); }
+        if (gDebug) { System.out.println("Creating DexDbHelper."); }
         gDexDb = new DexDbHelper(dexDbName);
 
-        if (DEBUG) { System.out.println("Droping data from DB (if exists)."); }
+        if (gDebug) { System.out.println("Droping data from DB (if exists)."); }
         rtn = gDexDb.dropTables();
         if (rtn != 0) {
             System.err.println("[ERROR] Error dropping tables!");
             System.exit(rtn);
         }
       
-        if (DEBUG) { System.out.println("About to create tables..."); }
+        if (gDebug) { System.out.println("About to create tables..."); }
         rtn = gDexDb.createTables();
         if (rtn != 0) {
             System.err.println("[ERROR] Error creating tables!");
             System.exit(rtn);
         }
 
-        if (DEBUG) { System.out.println("About to process DEX..."); }
+        if (gDebug) { System.out.println("About to process DEX..."); }
         rtn = processDex();
         if (rtn != 0) {
             System.err.println("[ERROR] Error processing dex!");    
         }
 
         /* Close it down. */
-        if (DEBUG) { System.out.println("Closing database."); }
+        if (gDebug) { System.out.println("Closing database."); }
         rtn = gDexDb.closeDatabase();
         if (rtn != 0) {
             System.err.println("[ERROR] Could not close database!");
