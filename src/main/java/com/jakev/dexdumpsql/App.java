@@ -20,7 +20,8 @@ import com.jakev.dexdumpsql.DexDbHelper;
 
 import java.io.File;
 import java.io.IOException;
-
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
@@ -29,8 +30,8 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
+import org.jf.dexlib2.dexbacked.DexBackedDexFile;
 import org.jf.dexlib2.iface.ClassDef;
-import org.jf.dexlib2.iface.DexFile;
 import org.jf.dexlib2.DexFileFactory;
 
 public class App {
@@ -39,7 +40,7 @@ public class App {
     private static final String gCmdName = "dexdumpsql";
     private static final String gProgramVersion = "1.1";
 
-    private static DexFile gDexFile = null;
+    private static DexBackedDexFile gDexFile = null;
     private static DexDbHelper gDexDb = null;
 
     private static final int METHOD_TYPE_DIRECT = 0;
@@ -141,6 +142,22 @@ public class App {
 
         int rtn = 0;
         int i = 0;
+
+        /* Process Strings */
+        if (gDebug) {
+            System.out.println("Adding strings");
+        }
+
+        int stringCount = gDexFile.getStringCount();
+        List<String> stringValues = new ArrayList<String>();
+
+        while (i < stringCount) {
+            stringValues.add(gDexFile.getString(i));
+            i++;
+        }
+        gDexDb.addStrings(stringValues);
+
+        i = 0;
 
         /* Process each class */
         for (ClassDef classDef: gDexFile.getClasses()) {
@@ -258,7 +275,7 @@ public class App {
 
         if (gDebug) { System.out.println("Loading DEX into object."); }
         try {
-            gDexFile = DexFileFactory.loadDexFile(dexFileName, sdkVersion);
+            gDexFile = DexFileFactory.loadDexFile(dexFileName, sdkVersion, true);
         } catch (IOException e){
             System.err.println("[ERROR] Unable to load DEX file!");
             System.exit(-4);

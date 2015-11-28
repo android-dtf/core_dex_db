@@ -26,6 +26,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.SQLException;
+import java.util.List;
 
 public class DexDbHelper {
 
@@ -56,6 +57,13 @@ public class DexDbHelper {
         String sql = "";        
 
         try {
+
+            /* Strings Table */
+            sql = "CREATE TABLE strings " +
+                         "(id INTEGER PRIMARY KEY NOT NULL," +
+                         " name           TEXT    NOT NULL)";
+            stmt.executeUpdate(sql);
+
             /* Classes Table */
             sql = "CREATE TABLE classes " +
                          "(id INTEGER PRIMARY KEY NOT NULL," +
@@ -108,6 +116,7 @@ public class DexDbHelper {
         int rtn = 0;
 
         try {
+            stmt.executeUpdate("DROP TABLE IF EXISTS strings");
             stmt.executeUpdate("DROP TABLE IF EXISTS classes");
             stmt.executeUpdate("DROP TABLE IF EXISTS static_fields");
             stmt.executeUpdate("DROP TABLE IF EXISTS instance_fields");
@@ -134,6 +143,32 @@ public class DexDbHelper {
 
         return rtn;
     }
+
+    public int addStrings(List<String> stringValues) {
+
+        int i = 0;
+        int rtn = 0;
+        String sql = "INSERT INTO strings (name) VALUES (?)";
+
+        try {
+            PreparedStatement pStmt = con.prepareStatement(sql);
+
+            for (String stringValue : stringValues) {
+                pStmt.setString(1, stringValue);
+                pStmt.addBatch();
+                i++;
+
+                if (i % 1000 == 0 || i == stringValues.size()) {
+                    pStmt.executeBatch(); // Execute every 1000 items.
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println(e);
+            rtn = -1;
+        }
+
+        return rtn;
+    } 
 
     public int addClass(int classIdx, String classDescriptor,
                         int accessFlags, String superclassDescriptor) {
