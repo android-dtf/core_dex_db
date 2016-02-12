@@ -222,8 +222,10 @@ public class App {
     public static void main(String[] args) {
 
         int rtn = 0;
-    
-        String dexFileName = "";
+
+        File inputFile = null;
+        String inputFileName = "";
+        String dexFileName = "classes.dex";
         String dexDbName = "";
         int sdkVersion = 0;
 
@@ -233,8 +235,9 @@ public class App {
         gOptions.addOption("a", true, "Android API level to use.");
         gOptions.addOption("d", false, "Show debugging information.");
         gOptions.addOption("h", false, "Show help screen.");
-        gOptions.addOption("i", true, "Input DEX/ODEX file.");
+        gOptions.addOption("i", true, "Input DEX/ODEX/JAR file.");
         gOptions.addOption("o", true, "Output DB file.");
+        gOptions.addOption("x", true, "Name of DEX file in ZIP/JAR.");
 
         try {
             cmd = parser.parse(gOptions, args);
@@ -243,6 +246,9 @@ public class App {
                 usage();
                 System.exit(0);
             }
+
+            if (cmd.hasOption("x"))
+                dexFileName = cmd.getOptionValue("x");
 
             if (cmd.hasOption("d"))
                 gDebug = true;
@@ -258,7 +264,7 @@ public class App {
             System.exit(-1);
         }
 
-        dexFileName = cmd.getOptionValue("i");
+        inputFileName = cmd.getOptionValue("i");
         dexDbName = cmd.getOptionValue("o");
 
         try {
@@ -268,17 +274,23 @@ public class App {
             System.exit(-2);
         }
 
-        if (!isFile(dexFileName)) {
-            System.err.println("[ERROR] File '"+dexFileName+"' does not exist!");
+        if (!isFile(inputFileName)) {
+            System.err.println("[ERROR] File '"+inputFileName+"' does not exist!");
             System.exit(-3);
         }
 
         if (gDebug) { System.out.println("Loading DEX into object."); }
+
+        inputFile = new File(inputFileName);
+
         try {
-            gDexFile = DexFileFactory.loadDexFile(dexFileName, sdkVersion, true);
+            gDexFile = DexFileFactory.loadDexFile(inputFile, dexFileName, sdkVersion, true);
         } catch (IOException e){
             System.err.println("[ERROR] Unable to load DEX file!");
             System.exit(-4);
+        } catch (DexFileFactory.NoClassesDexException e) {
+            System.err.println("[ERROR] No DEX file in ZIP with name: "+dexFileName);
+            System.exit(-5);
         }
 
         if (gDebug) { System.out.println("Creating DexDbHelper."); }
