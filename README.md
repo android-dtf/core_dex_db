@@ -14,6 +14,9 @@ Utility for creating and processing DEX databases for frameworks.
 ### classsearch
 Utility for searching DEX databases for classes, strings, etc.
 
+### dexdiff.py
+Utility for comparing DEX databases.
+
 ### DexDumpSQL
 Java library for processing strings, classes, methods, and fields of a DEX file into a SQL database for fast querying.
 
