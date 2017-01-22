@@ -1,0 +1,418 @@
+#!/usr/bin/env python
+# DTF Core Content
+# Copyright 2013-2015 Jake Valletta (@jake_valletta)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+"""Generate DEX Databases for Applications"""
+from argparse import ArgumentParser
+
+import os
+import os.path
+
+from dtf.globals import DTF_PACKAGES_DIR
+from dtf.module import Module
+from dtf.packages import launch_binary
+
+import dtf.properties as prop
+import dtf.logging as log
+
+import AppDb
+
+
+#DEFAULT_DATA_DIR_PROP = "diff-data-dir"
+
+TAG = "appdexdb"
+
+SYSAPPS_DB_NAME = 'sysapps.db'
+APPDEX_DBS_DIR = 'appdexdbs'
+
+class appdexdb(Module):
+
+    """Module class for manipulating app DEX DBs"""
+
+    about = 'Create and compare application DEX DBs.'
+    author = 'Jake Valletta (jakev)'
+    health = 'stable'
+    name = 'appdexdb'
+    version = '1.4'
+
+    local_appdb = None
+    diff_appdb = None
+    system_apps_dir = ''
+    appdexdbs_dir = ''
+    sdk = 0
+
+    def usage(self):
+
+        """Print usage message"""
+
+        print "AppDexDb dtf Module v%s" % self.version
+        print ""
+        print "Submodules:"
+        print "    create       Create DEX db for AOSP application(s)."
+        print "    diff         Diff the DEX for AOSP application(s)."
+        print ""
+        return 0
+
+    @classmethod
+    def determine_diff_database(cls, args):
+
+        """Determine which diffing sysappdb to use"""
+
+        args_diff_dir = args.diff_dir
+
+        # First check if we no arg is set
+        if args_diff_dir is None:
+
+            # First check for our argument.
+            try:
+                prop_diff_dir = prop.get_prop('Local', 'diff-data-dir')
+            except prop.PropertyError:
+                prop_diff_dir = None
+
+            if prop_diff_dir is not None:
+                diff_sysapps_db = "%s/.dbs/%s" % (prop_diff_dir,
+                                                  SYSAPPS_DB_NAME)
+
+                if not os.path.isfile(diff_sysapps_db):
+                    log.e(TAG, "Diff DB '%s' doesn't exist!" %
+                                                 diff_sysapps_db)
+                    return None
+                else:
+                    return diff_sysapps_db
+            # Not set
+            else:
+                # Make sure that the AOSP_DB actually exists.
+                if not AppDb.isAOSPDataInstalled():
+                    log.e(TAG, "Missing diffing data for this API!")
+                    return None
+
+                diff_sysapps_db = ("%s/aosp-data-%s/.dbs/%s" %
+                                         (DTF_PACKAGES_DIR,
+                                          prop.get_prop("Info", "sdk"),
+                                          SYSAPPS_DB_NAME))
+
+                return diff_sysapps_db
+
+        # It is set, use it.
+        else:
+            diff_sysapps_db = "%s/.dbs/%s" % (args_diff_dir, SYSAPPS_DB_NAME)
+
+            if not os.path.isfile(diff_sysapps_db):
+                log.e(TAG, "Diff DB '%s' doesn't exist!" %
+                                               diff_sysapps_db)
+                return None
+            else:
+                return diff_sysapps_db
+
+    @classmethod
+    def determine_app_dex_diff_database(cls, args, app_name):
+
+        """Determine which appdexdb to use"""
+
+        args_diff_dir = args.diff_dir
+
+        # First check if we no arg is set
+        if args_diff_dir is None:
+
+            # First check for our argument.
+            try:
+                prop_diff_dir = prop.get_prop('Local', 'diff-data-dir')
+            except prop.PropertyError:
+                prop_diff_dir = None
+
+            if prop_diff_dir is not None:
+                diff_appdex_db = ("%s/.dbs/%s/%s.db"
+                                    % (prop_diff_dir, APPDEX_DBS_DIR,
+                                       app_name))
+
+                if not os.path.isfile(diff_appdex_db):
+                    log.e(TAG, "Diff DB '%s' doesn't exist!" %
+                                                 diff_appdex_db)
+                    return None
+                else:
+                    return diff_appdex_db
+            # Not set
+            else:
+                # Make sure that the AOSP_DB actually exists.
+                if not AppDb.isAOSPDataInstalled():
+                    log.e(TAG, "Missing diffing data for this API!")
+                    return None
+
+                diff_appdex_db = ("%s/aosp-data-%s/.dbs/%s/%s.db"
+                                        % (DTF_PACKAGES_DIR,
+                                           prop.get_prop("Info", "sdk"),
+                                           APPDEX_DBS_DIR,
+                                           app_name))
+
+                if not os.path.isfile(diff_appdex_db):
+                    log.e(TAG, "Diff DB '%s' doesn't exist!"
+                                % diff_appdex_db)
+                    return None
+                else:
+                    return diff_appdex_db
+
+        # It is set, use it.
+        else:
+            diff_appdex_db = ("%s/.dbs/%s/%s.db"
+                                % (args_diff_dir, APPDEX_DBS_DIR,
+                                   app_name))
+
+            if not os.path.isfile(diff_appdex_db):
+                log.e(TAG, "Diff DB '%s' doesn't exist!" %
+                                               diff_appdex_db)
+                return None
+            else:
+                return diff_appdex_db
+
+    # Diff related
+    @classmethod
+    def do_diff(cls, local_appdex_db, diff_appdex_db):
+
+        """Do app diffing"""
+
+        out, err, rtn = launch_binary("dexdiff.py", "\"%s\" \"%s\""
+                                    % (local_appdex_db, diff_appdex_db))
+        # Hack
+        print "\n".join(out)
+        return rtn
+
+    # End diff related
+
+    # Creation related
+    def process_applications(self, app_list):
+
+        """Process list of applications"""
+
+        rtn = 0
+
+        if not os.path.isdir(self.appdexdbs_dir):
+            os.mkdir(self.appdexdbs_dir)
+
+        for app in app_list:
+
+            project_name = app.project_name
+            log.i(TAG, "Processing '%s'..." % project_name)
+
+            odex_name = "%s/%s.odex" % (self.system_apps_dir, project_name)
+            apk_name = "%s/%s.apk" % (self.system_apps_dir, project_name)
+            out_name = "%s/%s.db" % (self.appdexdbs_dir, project_name)
+
+            # First try to do the JAR, but the DEX might not exist in the
+            # JAR.
+            if os.path.isfile(apk_name):
+                log.d(TAG, "Attempting APK mode...")
+                rtn = self.process_application(apk_name, out_name)
+
+                if rtn != 0:
+                    # APK mode has failed.
+                    log.d(TAG, "APK mode failed (%d), trying ODEX..." %
+                                                        (rtn))
+                    # Let's check and try for ODEX now
+                    if os.path.isfile(odex_name):
+
+                        rtn = self.process_application(odex_name, out_name)
+
+                        if rtn != 0:
+                            log.e(TAG, "Not able to do APK or ODEX : %s (%d)" %
+                                                        (project_name, rtn))
+                    else:
+                        log.w(TAG, "No ODEX or APK for: %s" % project_name)
+                        rtn = 0
+
+            # The JAR doesnt even exist, so try the ODEX.
+            elif os.path.isfile(odex_name):
+                log.d(TAG, "Attempting ODEX mode...")
+                rtn = self.process_application(odex_name, out_name)
+
+                if rtn != 0:
+                    log.e(TAG, "Not able to unpack: %s (%d)" %
+                                                        (project_name, rtn))
+
+            # This means the APK and ODEX don't exist. Error.
+            else:
+                log.w(TAG, "No ODEX or APK for: %s" % project_name)
+
+        return rtn
+
+    def process_application(self, in_file, out_file):
+
+        """Process a single application"""
+
+        cmd_args = "-i \"%s\" -o \"%s\" -a %s" % (in_file, out_file, self.sdk)
+
+        out, err, rtn = launch_binary("dexdumpsql.jar",
+                                      cmd_args, launcher="java -jar")
+
+        log.d(TAG, "Processing completed: %d" % rtn)
+        return rtn
+
+    def get_all_applications(self):
+
+        """Return a list of all apps"""
+
+        return self.local_appdb.getApps(dont_resolve=True)
+
+    def get_all_aosp_applications(self):
+
+        """Determine diff of applications by diffing"""
+
+        aosp_app_list = []
+
+        aosp_app_list = [i.project_name for i in
+                                self.diff_appdb.getApps(dont_resolve=True)]
+
+        return [i for i in self.local_appdb.getApps() if i.project_name in
+                                aosp_app_list]
+    # End create related
+
+    def cmd_create(self, args):
+
+        """Create DEX db(s)"""
+
+        rtn = 0
+
+        parser = ArgumentParser(prog='appdexdb create',
+                            description='Create DEX DB for an application(s).')
+        parser.add_argument('application_name', metavar="application_name",
+                            type=str, nargs='?', default=None,
+                            help='Process a single application.')
+        parser.add_argument('--all-aosp', dest='aosp_mode',
+                            action='store_const', const=True, default=False,
+                            help='Convert all AOSP applications.')
+        parser.add_argument('--all', dest='all_mode', action='store_const',
+                            const=True, default=False,
+                            help='Convert all applications.')
+        parser.add_argument('--diff-dir', dest='diff_dir', default=None,
+                            help='Use data in specified dir to diff.')
+
+        parsed_args = parser.parse_args(args)
+
+        db_dir = prop.get_prop('Local', 'db-dir')
+        system_apps_dir = prop.get_prop("Local", "system-apps-dir")
+        local_sysapps_db_name = "%s/%s/%s" % (prop.TOP, db_dir,
+                                              SYSAPPS_DB_NAME)
+
+        self.local_appdb = AppDb.AppDb(local_sysapps_db_name, safe=True)
+        self.diff_appdb = None
+
+        self.sdk = prop.get_prop("Info", "sdk")
+        self.system_apps_dir = "%s/%s" % (prop.TOP, system_apps_dir)
+        self.appdexdbs_dir = "%s/%s" % (db_dir, APPDEX_DBS_DIR)
+
+
+
+        # Is this all mode?
+        if parsed_args.all_mode:
+            log.i(TAG, "Doing all applications...")
+            rtn = self.process_applications(self.get_all_applications())
+
+        # What about only AOSP?
+        elif parsed_args.aosp_mode:
+
+            diff_db = self.determine_diff_database(parsed_args)
+            if diff_db is None:
+                log.e(TAG, "Unable to determine diff DB!")
+                return -2
+
+            log.d(TAG, "Using diff DB: '%s'" % diff_db)
+
+            self.diff_appdb = AppDb.AppDb(diff_db, safe=True)
+            log.i(TAG, "Doing all AOSP applications...")
+            rtn = self.process_applications(self.get_all_aosp_applications())
+
+        # Single
+        elif parsed_args.application_name is not None:
+
+            app = self.local_appdb.getAppByName(parsed_args.application_name)
+
+            if app is None:
+                log.e(TAG, "Application '%s' not found for local project."
+                                                % parsed_args.application_name)
+                return -2
+
+            rtn = self.process_applications([app])
+
+        # ERROR
+        else:
+            log.e(TAG, "You must supply an app name, --all, or, --all-aosp.")
+            rtn = -1
+
+        return rtn
+
+    def cmd_diff(self, args):
+
+        """Diff DEX db(s)"""
+
+        parser = ArgumentParser(prog='appdexdb diff',
+                            description='Compare app DEX code to another.')
+        parser.add_argument('application_name', metavar="application_name",
+                            type=str, default=None,
+                            help='Diff a single application.')
+        parser.add_argument('--diff-dir', dest='diff_dir', default=None,
+                            help='Diff against data in specified dir.')
+
+        parsed_args = parser.parse_args(args)
+
+        application_name = parsed_args.application_name
+        db_dir = prop.get_prop('Local', 'db-dir')
+        local_sysapps_db_name = "%s/%s/%s" % (prop.TOP, db_dir,
+                                              SYSAPPS_DB_NAME)
+
+        self.local_appdb = AppDb.AppDb(local_sysapps_db_name, safe=True)
+
+        self.appdexdbs_dir = "%s/%s" % (db_dir, APPDEX_DBS_DIR)
+
+
+        # Determine the appdexdb/*.db to diff against
+        diff_appdex_db = self.determine_app_dex_diff_database(parsed_args,
+                                                              application_name)
+        if diff_appdex_db is None:
+            log.e(TAG, "Unable to determine diff appdex DB!")
+            return -2
+
+        log.d(TAG, "Using diff appdex DB: '%s'" % diff_appdex_db)
+
+        # Get our local appdex.db
+        app = self.local_appdb.getAppByName(application_name)
+        if app is None:
+            log.e(TAG, "No application with name '%s' found in project!"
+                                                    % (application_name))
+            return -3
+
+        # Make sure the local DEX db exist.
+        local_appdex_db = "%s/%s.db" % (self.appdexdbs_dir, application_name)
+
+        if not os.path.isfile(local_appdex_db):
+            log.e(TAG, "No local DEX DB for application '%s'"
+                                                    % application_name)
+            return -4
+
+        return self.do_diff(local_appdex_db, diff_appdex_db)
+
+
+    def execute(self, args):
+
+        """Main module execution"""
+
+        if len(args) == 0:
+            return self.usage()
+        mode = args.pop(0)
+
+        if mode == 'create':
+            return self.cmd_create(args)
+        elif mode == 'diff':
+            return self.cmd_diff(args)
+        else:
+            return self.usage()
