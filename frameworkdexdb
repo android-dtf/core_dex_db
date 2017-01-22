@@ -44,7 +44,7 @@ class frameworkdexdb(Module):
     author = 'Jake Valletta (jakev)'
     health = 'stable'
     name = 'frameworkdexdb'
-    version = '1.3'
+    version = '1.3.0'
 
     diff_fwdb = ""
     frameworkdexdbs_dir = ""
@@ -185,7 +185,7 @@ class frameworkdexdb(Module):
         cmd_args = "-i \"%s\" -o \"%s\" -a %s" % (in_odex, out_db, self.sdk)
 
 
-        rtn = launch_binary('dexdumpsql.jar', cmd_args,
+        rtn = launch_binary('DexDumpSql.jar', cmd_args,
                                       launcher="java -jar")[2]
 
         log.d(TAG, "Processing completed : %d" % rtn)

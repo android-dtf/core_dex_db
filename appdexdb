@@ -45,7 +45,7 @@ class appdexdb(Module):
     author = 'Jake Valletta (jakev)'
     health = 'stable'
     name = 'appdexdb'
-    version = '1.4'
+    version = '1.4.0'
 
     local_appdb = None
     diff_appdb = None
@@ -252,7 +252,7 @@ class appdexdb(Module):
 
         cmd_args = "-i \"%s\" -o \"%s\" -a %s" % (in_file, out_file, self.sdk)
 
-        out, err, rtn = launch_binary("dexdumpsql.jar",
+        out, err, rtn = launch_binary("DexDumpSql.jar",
                                       cmd_args, launcher="java -jar")
 
         log.d(TAG, "Processing completed: %d" % rtn)
