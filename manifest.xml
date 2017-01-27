@@ -23,6 +23,14 @@
           about="Create dexdb for a framework file or all frameworks."
           localName="frameworkdexdb" />
 
+  <Item type="module"
+          name="oatdextract"
+          version="1.0.0"
+          health="stable"
+          author="Jake Valletta (jakev)"
+          about="Extract DEX files from OAT file."
+          localName="oatdextract" />
+
     <Item type="binary"
           name="dexdiff.py"
           version="1.0.0"
