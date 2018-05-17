@@ -39,6 +39,13 @@
           about="Extract DEX files from OAT file."
           localName="oatdextract" />
 
+    <Item type="module"
+          name="oatpatch"
+          version="1.0.0"
+          author="Jake Valletta (jakev)"
+          about="Generate and patch OAT files."
+          localName="oatpatch" />
+
     <Item type="binary"
           name="dexdiff.py"
           version="1.0.0"

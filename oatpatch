@@ -1,0 +1,166 @@
+#!/usr/bin/env python
+#
+# DTF Core Content
+# Copyright 2013-2018 Jake Valletta (@jake_valletta)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+"""OAT Signature Patching"""
+
+from __future__ import print_function
+from __future__ import absolute_import
+
+import os
+import os.path
+import struct
+
+from argparse import ArgumentParser
+
+import dtf.logging as log
+import dtf.module as module
+from dtf.adb import DtfAdb
+from dtf.included import smali
+
+import OatFile
+
+TEMP_ODEX_NAME = "new.odex"
+
+TAG = "oatpatch"
+
+class oatpatch(module.Module):
+
+    """Module class for patching ODEX files"""
+
+    about = 'Generate and patch OAT files.'
+    author = 'Jake Valletta (jakev)'
+    name = 'oatpatch'
+    version = '1.0.0'
+
+    @module.sub_cmd("patch")
+    def cmd_do_patch(self, args):
+
+        """Perform processing"""
+
+        parser = ArgumentParser(prog='oatpatch',
+                                description='Create a new OAT from existing project.')
+        parser.add_argument('smali_dir', metavar="smali_dir", type=str,
+                            default=None,
+                            help='The app name.')
+        parser.add_argument('-o', '--out-oat', metavar="out_oat", type=str,
+                            default=None,
+                            help='The output OAT')
+        parser.add_argument('-r', '--original-oat', metavar="original_oat", type=str,
+                            default=None,
+                            help='Name of output file (appends if multiple)')
+
+        pargs = parser.parse_args(args)
+        adb = DtfAdb()
+        self.cd_launch_dir()
+
+        smali_dir = pargs.smali_dir
+        out_oat = pargs.out_oat
+        original_oat = pargs.original_oat
+
+        # Basic error checking
+        if not os.path.isfile(original_oat):
+            log.e(TAG, "File '%s' does not exist!" % original_oat)
+            return -1
+        elif os.path.isfile(out_oat):
+            log.e(TAG, "Output file '%s' exists!" % out_oat)
+            return -2
+
+        # Generate DEX
+        log.i(TAG, "Building new smali code...")
+        (out, err, rtn) = smali("a -o new.classes.dex %s" % smali_dir)
+
+        if rtn != 0:
+            log.e(TAG, "Error running smali:")
+            print(err)
+
+        log.i(TAG, "Parsing original OAT...")
+
+        original_oat = self.read_and_parse_oat(original_oat)
+
+        if len(original_oat.dex_headers) > 1:
+            log.e(TAG, "Only single-DEX OAT files are supported at this time!")
+            return -1
+
+        original_file_location = original_oat.dex_headers[0].file_location.value
+        original_checksum = original_oat.dex_headers[0].checksum
+
+        log.d(TAG, "Original name: %s" % original_file_location)
+        log.d(TAG, "Original checksum: 0x%4x" % original_checksum)
+
+        temp_name = original_file_location.replace('/', '_')
+
+        log.d(TAG, "Temp name: %s" % temp_name)
+
+        # Generate OAT
+        adb.push("new.classes.dex", "/data/local/tmp/%s" % temp_name)
+        cmd = ("cd /data/local/tmp/; dex2oat --oat-file=%s --dex-file=%s"
+               % (TEMP_ODEX_NAME, temp_name))
+        adb.shell_command(cmd)
+        adb.pull("/data/local/tmp/%s" % TEMP_ODEX_NAME)
+
+        if not os.path.isfile(TEMP_ODEX_NAME):
+            log.e(TAG, "Error somewhere! Check adb logs: adb logcat|grep dex2oat")
+            return -1
+
+        # Do the Patching
+        log.i(TAG, "Ready to patch new OAT...")
+
+        # We need to open the new.odex, then read() the entire thing.
+        new_oat_fd = open(TEMP_ODEX_NAME, 'rb')
+        out_oat_fd = open(out_oat, 'w+b')
+
+        out_oat_fd.write(new_oat_fd.read())
+
+        # Go ahead and close out the new FD.
+        new_oat_fd.close()
+
+        new_oat = self.read_and_parse_oat(TEMP_ODEX_NAME)
+        new_checksum_offset = new_oat.dex_headers[0].checksum.offset
+        new_file_location_offset = new_oat.dex_headers[0].file_location.offset
+
+        # First the file location
+        log.i(TAG, "Patching DEX file location to '%s' @ offset 0x%4x"
+              % (original_file_location, new_file_location_offset))
+
+        out_oat_fd.seek(new_file_location_offset)
+        out_oat_fd.write(original_file_location)
+
+        # Then the checksum
+        log.i(TAG, "Patching Checksum to 0x%4x @ offset 0x%4x"
+              % (original_checksum, new_checksum_offset))
+
+        out_oat_fd.seek(new_checksum_offset)
+        out_oat_fd.write(struct.pack("I", original_checksum.value))
+
+        out_oat_fd.close()
+
+        # Clean up!
+        log.i(TAG, "Cleaning up...")
+        os.remove(TEMP_ODEX_NAME)
+        os.remove("new.classes.dex")
+        adb.shell_command("rm /data/local/tmp/%s" % temp_name)
+        adb.shell_command("rm /data/local/tmp/%s" % TEMP_ODEX_NAME)
+
+        return 0
+
+    @classmethod
+    def read_and_parse_oat(cls, original_oat_file):
+
+        """Read an OAT and parse"""
+
+        with open(original_oat_file, 'rb') as oat_file:
+            return OatFile.OatElf(oat_file)
