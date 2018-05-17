@@ -31,7 +31,7 @@
           about="Create dexdb for a framework file or all frameworks."
           localName="frameworkdexdb" />
 
-  <Item type="module"
+    <Item type="module"
           name="oatdextract"
           version="1.0.0"
           health="stable"
@@ -60,4 +60,11 @@
           health="beta"
           author="Jake Valletta (jakev)"
           localName="DexDb" />
+
+    <Item type="library"
+          name="OatFile"
+          about="Read and Parse OAT Files"
+          version="1.0.0"
+          author="Jake Valletta (jakev)"
+          localName="OatFile" />
 </Items>
