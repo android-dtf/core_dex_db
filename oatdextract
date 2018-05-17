@@ -62,7 +62,6 @@ class oatdextract(Module):
 
     about = 'Extract DEX files from an OAT file.'
     author = 'Jake Valletta (jakev)'
-    health = 'stable'
     name = 'oatextract'
     version = '1.0.0'
 

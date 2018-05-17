@@ -43,7 +43,6 @@ class appdexdb(Module):
 
     about = 'Create and compare application DEX DBs.'
     author = 'Jake Valletta (jakev)'
-    health = 'stable'
     name = 'appdexdb'
     version = '1.4.0'
 
